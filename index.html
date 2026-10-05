@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pasapalabra: Technology Workshop Tools</title>
+    <!-- Librería para generación automática de PDF en el navegador -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f0f4f8;
+            --primary: #2b6cb0;
+            --accent: #d69e2e;
+            --correct: #38a169;
+            --error: #e53e3e;
+            --pending: #3182ce;
+            --text: #2d3748;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #1a365d;
+            margin-bottom: 5px;
+        }
+
+        .stats-panel {
+            display: flex;
+            gap: 15px;
+            background: white;
+            padding: 12px 25px;
+            border-radius: 50px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+            font-weight: bold;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-value {
+            background: #edf2f7;
+            padding: 4px 10px;
+            border-radius: 12px;
+            color: var(--primary);
+        }
+
+        .game-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+            width: 100%;
+            max-width: 1150px;
+        }
+
+        @media (min-width: 900px) {
+            .game-layout {
+                flex-direction: row;
+                justify-content: center;
+                align-items: flex-start;
+            }
+        }
+
+        /* Wheel / Rosco */
+        .rosco-container {
+            position: relative;
+            width: 340px;
+            height: 340px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .letter-node {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--pending);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .letter-node:hover {
+            transform: scale(1.15);
+        }
+
+        .letter-node.active {
+            transform: scale(1.28);
+            background-color: #d69e2e !important;
+            box-shadow: 0 0 14px #d69e2e;
+            z-index: 10;
+        }
+
+        .letter-node.correct { background-color: var(--correct); }
+        .letter-node.error { background-color: var(--error); }
+
+        .rosco-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-weight: bold;
+            color: #4a5568;
+            font-size: 0.95rem;
+            line-height: 1.3;
+        }
+
+        /* Control Box */
+        .control-box {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 450px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .tool-image-container {
+            width: 100%;
+            height: 120px;
+            background-color: #f8fafc;
+            border: 2px dashed #cbd5e0;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .tool-image-container svg {
+            max-width: 100%;
+            max-height: 100px;
+            filter: drop-shadow(0px 3px 3px rgba(0,0,0,0.1));
+        }
+
+        .clue-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background-color: #e2e8f0;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+
+        .definition {
+            font-size: 1.05rem;
+            line-height: 1.4;
+            min-height: 60px;
+            color: #2d3748;
+        }
+
+        .spanish-hint {
+            background-color: #feebc8;
+            color: #744210;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            display: none;
+            margin-top: 8px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #cbd5e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .btn-submit { background-color: var(--correct); color: white; }
+        .btn-pass { background-color: var(--pending); color: white; }
+        .btn-hint { background-color: #ed8936; color: white; }
+        .btn-letter { background-color: #805ad5; color: white; }
+        .btn-pdf { background-color: #2b6cb0; color: white; margin-top: 10px; width: 100%; }
+
+        button:disabled {
+            background-color: #cbd5e0;
+            cursor: not-allowed;
+        }
+
+        .store-section {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .store-title {
+            font-size: 0.85rem;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Lateral Flash Panel */
+        .vocab-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 250px;
+            border-left: 5px solid var(--accent);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-self: stretch;
+            justify-content: center;
+        }
+
+        .vocab-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .vocab-box {
+            background-color: #f7fafc;
+            border: 1px dashed #cbd5e0;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            min-height: 90px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .vocab-text {
+            font-size: 1.05rem;
+            line-height: 1.4;
+            transition: opacity 0.3s ease;
+        }
+
+        .vocab-timer {
+            font-size: 0.75rem;
+            color: #a0aec0;
+            text-align: center;
+        }
+
+        /* Modal & Final PDF Report */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            max-width: 650px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #edf2f7;
+            padding-bottom: 10px;
+        }
+
+        .pdf-student-input {
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .pdf-student-input input {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            flex: 1;
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.85rem;
+        }
+
+        .results-table th, .results-table td {
+            border: 1px solid #e2e8f0;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .results-table th {
+            background-color: #f7fafc;
+            color: #4a5568;
+        }
+
+        .tag-correct { color: var(--correct); font-weight: bold; }
+        .tag-error { color: var(--error); font-weight: bold; }
+
+        .btn-restart { background-color: #718096; color: white; width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Technology Workshop Tools</h1>
+        <p>Pasapalabra English Practice (1.º - 3.º ESO)</p>
+    </header>
+
+    <div class="stats-panel">
+        <div class="stat-item">Aciertos: <span id="score-hits" class="stat-value">0</span></div>
+        <div class="stat-item">Errores: <span id="score-misses" class="stat-value">0</span></div>
+        <div class="stat-item">Tiempo: <span id="timer" class="stat-value">00:00</span></div>
+        <div class="stat-item">Créditos: <span id="credits" class="stat-value">1000 🪙</span></div>
+    </div>
+
+    <div class="game-layout">
+        <div class="rosco-container" id="rosco">
+            <div class="rosco-center">WORKSHOP<br>TOOLS</div>
+        </div>
+
+        <div class="control-box">
+            <div class="tool-image-container" id="tool-image">
+                <!-- Dynamic SVG -->
+            </div>
+
+            <div>
+                <span id="clue-type" class="clue-badge">STARTS WITH A</span>
+                <div id="definition" class="definition">Loading question...</div>
+                <div id="spanish-hint" class="spanish-hint"></div>
+            </div>
+
+            <div class="input-group">
+                <input type="text" id="answer-input" placeholder="Type your answer in English..." autocomplete="off">
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-submit" onclick="checkAnswer()">COMPROBAR</button>
+                <button class="btn-pass" onclick="pasapalabra()">PASAPALABRA</button>
+            </div>
+
+            <div class="store-section">
+                <span class="store-title">Comprar Pistas (Tienda de Créditos)</span>
+                <div class="btn-group">
+                    <button id="btn-buy-hint" class="btn-hint" onclick="buySpanishHint()">Pista Español (-10 🪙)</button>
+                    <button id="btn-buy-letter" class="btn-letter" onclick="buyLetter()">Revelar Letra (-15 🪙)</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="vocab-panel">
+            <div class="vocab-title">💡 Flash Vocabulario</div>
+            <div class="vocab-box">
+                <div id="vocab-flash-text" class="vocab-text">Cargando pista...</div>
+            </div>
+            <div class="vocab-timer">Cambia cada 10 segundos</div>
+        </div>
+    </div>
+
+    <!-- Final Modal with Printable PDF Report -->
+    <div id="end-modal" class="modal">
+        <div class="modal-content">
+            <div id="pdf-report-area">
+                <div class="modal-header">
+                    <h2>Informe Final: Pasapalabra Technology Tools</h2>
+                    <p id="report-date" style="font-size:0.8rem; color:#718096;"></p>
+                </div>
+
+                <div class="pdf-student-input">
+                    <label><strong>Nombre del alumno/a:</strong></label>
+                    <input type="text" id="student-name" placeholder="Escribe tu nombre y apellidos...">
+                </div>
+
+                <div class="stats-panel" style="box-shadow: none; border: 1px solid #e2e8f0;">
+                    <div class="stat-item">Aciertos: <span id="final-hits" class="stat-value">0</span> / 26</div>
+                    <div class="stat-item">Errores: <span id="final-misses" class="stat-value">0</span></div>
+                    <div class="stat-item">Tiempo: <span id="final-time" class="stat-value">00:00</span></div>
+                    <div class="stat-item">Créditos: <span id="final-credits" class="stat-value">1000</span> 🪙</div>
+                </div>
+
+                <h3 style="margin-top:15px; font-size:1rem; color:#2d3748;">Desglose Completo de Respuestas</h3>
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>Letra</th>
+                            <th>Herramienta (Inglés)</th>
+                            <th>Traducción</th>
+                            <th>Tu Respuesta</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-table-body">
+                        <!-- Dynamic Rows -->
+                    </tbody>
+                </table>
+            </div>
+
+            <button class="btn-pdf" onclick="downloadPDF()">📄 Descargar Resumen en PDF para el Profesor</button>
+            <button class="btn-restart" onclick="restartGame()">Volver a Jugar</button>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            { letter: 'A', type: 'STARTS WITH', word: 'ALLEN KEY', es: 'Llave Allen', def: 'An L-shaped tool used to turn screws and bolts with a hexagonal socket.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 18 10 L 18 42 A 6 6 0 0 0 24 48 L 50 48" fill="none" stroke="#2b6cb0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
+            { letter: 'B', type: 'STARTS WITH', word: 'DRILL BIT', es: 'Broca', def: 'A cutting tool fitted into a drill to make cylindrical holes.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="28" y="42" width="8" height="16" fill="#4a5568"/><path d="M 26 10 C 26 10 38 18 26 26 C 26 26 38 34 26 42 L 38 42 C 38 42 26 34 38 26 C 38 26 26 18 38 10 Z" fill="#718096"/><polygon points="26,10 32,4 38,10" fill="#a0aec0"/></svg>` },
+            { letter: 'C', type: 'STARTS WITH', word: 'CHISEL', es: 'Formón / Cincel', def: 'A sharp hand tool used for cutting or carving wood or metal.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="28" y="32" width="8" height="26" rx="2" fill="#c53030"/><rect x="29" y="14" width="6" height="18" fill="#a0aec0"/><polygon points="27,6 37,6 35,14 29,14" fill="#cbd5e0"/></svg>` },
+            { letter: 'D', type: 'STARTS WITH', word: 'DRILL', es: 'Taladro', def: 'A power tool used for making holes in hard materials.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 12 18 L 38 18 L 42 28 L 12 28 Z" fill="#3182ce"/><rect x="18" y="28" width="10" height="26" rx="2" fill="#2d3748"/><path d="M 38 20 L 52 20 L 52 26 L 38 26 Z" fill="#a0aec0"/><line x1="52" y1="23" x2="60" y2="23" stroke="#4a5568" stroke-width="3"/></svg>` },
+            { letter: 'E', type: 'STARTS WITH', word: 'EAR DEFENDERS', es: 'Protectores auditivos', def: 'Equipment worn over ears to protect hearing from high noise levels.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 14 36 A 20 20 0 0 1 50 36" fill="none" stroke="#2d3748" stroke-width="6"/><rect x="8" y="30" width="12" height="20" rx="5" fill="#e53e3e"/><rect x="44" y="30" width="12" height="20" rx="5" fill="#e53e3e"/></svg>` },
+            { letter: 'F', type: 'STARTS WITH', word: 'FILE', es: 'Lima', def: 'A metal tool with rough surfaces used to smooth or shape material.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="28" y="38" width="8" height="20" rx="2" fill="#d69e2e"/><rect x="29" y="8" width="6" height="30" fill="#a0aec0"/><line x1="29" y1="12" x2="35" y2="16" stroke="#718096" stroke-width="1.5"/><line x1="29" y1="18" x2="35" y2="22" stroke="#718096" stroke-width="1.5"/><line x1="29" y1="24" x2="35" y2="28" stroke="#718096" stroke-width="1.5"/></svg>` },
+            { letter: 'G', type: 'STARTS WITH', word: 'GOGGLES', es: 'Gafas de seguridad', def: 'Protective plastic glasses worn in the workshop to protect eyes.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="6" y="22" width="22" height="18" rx="6" fill="#63b3ed" opacity="0.8" stroke="#2b6cb0" stroke-width="3"/><rect x="36" y="22" width="22" height="18" rx="6" fill="#63b3ed" opacity="0.8" stroke="#2b6cb0" stroke-width="3"/><line x1="28" y1="28" x2="36" y2="28" stroke="#2b6cb0" stroke-width="4"/><path d="M 6 28 L 2 28 L 2 34 M 58 28 L 62 28 L 62 34" stroke="#2d3748" stroke-width="3" fill="none"/></svg>` },
+            { letter: 'H', type: 'STARTS WITH', word: 'HAMMER', es: 'Martillo', def: 'A heavy tool used to hit nails into wood or shape metal.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="28" y="22" width="8" height="36" rx="2" fill="#dd6b20"/><path d="M 16 12 L 44 12 L 44 22 L 16 22 Z" fill="#718096"/><rect x="44" y="14" width="6" height="6" fill="#a0aec0"/></svg>` },
+            { letter: 'I', type: 'STARTS WITH', word: 'SOLDERING IRON', es: 'Soldador eléctrico', def: 'A tool heated to melt solder wire to join electrical components.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="10" y="42" width="10" height="16" rx="2" fill="#2d3748"/><rect x="20" y="32" width="6" height="14" fill="#3182ce"/><line x1="23" y1="32" x2="48" y2="12" stroke="#a0aec0" stroke-width="4"/><polygon points="48,12 58,6 52,16" fill="#e2e8f0"/></svg>` },
+            { letter: 'J', type: 'STARTS WITH', word: 'JIGSAW', es: 'Sierra de calar', def: 'An electric saw with a narrow blade used to cut curves in wood.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 12 20 C 12 10 36 10 36 20 L 48 20 L 48 38 L 12 38 Z" fill="#dd6b20"/><rect x="16" y="38" width="28" height="4" fill="#2d3748"/><polygon points="28,42 32,42 30,56" fill="#718096"/></svg>` },
+            { letter: 'K', type: 'STARTS WITH', word: 'UTILITY KNIFE', es: 'Cúter', def: 'A cutting tool with a sharp retractable blade (also called cutter).', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="10" y="26" width="36" height="12" rx="3" fill="#e53e3e"/><polygon points="46,28 58,34 46,34" fill="#cbd5e0"/><rect x="20" y="22" width="6" height="4" fill="#2d3748"/></svg>` },
+            { letter: 'L', type: 'STARTS WITH', word: 'LEVEL', es: 'Nivel de burbuja', def: 'A tool with a bubble in liquid used to test if a surface is horizontal.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="6" y="24" width="52" height="16" rx="3" fill="#d69e2e"/><rect x="24" y="27" width="16" height="10" rx="5" fill="#ebf8ff" stroke="#2b6cb0" stroke-width="2"/><circle cx="32" cy="32" r="3" fill="#3182ce"/></svg>` },
+            { letter: 'M', type: 'STARTS WITH', word: 'MALLET', es: 'Mazo de madera/goma', def: 'A hammer with a large wooden or rubber head used to strike chisels.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="28" y="26" width="8" height="32" rx="2" fill="#d69e2e"/><rect x="14" y="10" width="36" height="20" rx="4" fill="#9b2c2c"/></svg>` },
+            { letter: 'N', type: 'STARTS WITH', word: 'NIPPERS', es: 'Tenazas', def: 'Pliers-like tool used for gripping, pulling or cutting wire and nails.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 18 56 L 28 32 L 20 12 C 20 12 30 20 32 30" fill="none" stroke="#e53e3e" stroke-width="6" stroke-linecap="round"/><path d="M 46 56 L 36 32 L 44 12 C 44 12 34 20 32 30" fill="none" stroke="#e53e3e" stroke-width="6" stroke-linecap="round"/><circle cx="32" cy="30" r="4" fill="#2d3748"/></svg>` },
+            { letter: 'O', type: 'STARTS WITH', word: 'OILCAN', es: 'Aceitera', def: 'A container used to apply lubricating oil to tools and machinery.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 16 30 C 16 20 40 20 40 30 L 44 52 L 12 52 Z" fill="#38a169"/><path d="M 32 20 L 56 8" stroke="#a0aec0" stroke-width="4" stroke-linecap="round"/><path d="M 16 32 C 8 32 8 44 14 44" fill="none" stroke="#2d3748" stroke-width="4"/></svg>` },
+            { letter: 'P', type: 'STARTS WITH', word: 'PLIERS', es: 'Alicates', def: 'A hand tool with two handles used for holding, bending or cutting wire.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 18 56 L 28 30 L 22 10 L 32 26 L 32 30" fill="none" stroke="#3182ce" stroke-width="7" stroke-linecap="round"/><path d="M 46 56 L 36 30 L 42 10 L 32 26 L 32 30" fill="none" stroke="#3182ce" stroke-width="7" stroke-linecap="round"/><circle cx="32" cy="28" r="4" fill="#2d3748"/></svg>` },
+            { letter: 'Q', type: 'CONTAINS', word: 'SQUARE', es: 'Escuadra', def: 'An L-shaped tool used to check or draw 90-degree right angles.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 12 10 L 12 54 L 54 54 L 54 42 L 24 42 L 24 10 Z" fill="#d69e2e" stroke="#744210" stroke-width="2"/><rect x="12" y="10" width="12" height="44" fill="#4a5568"/></svg>` },
+            { letter: 'R', type: 'STARTS WITH', word: 'RULER', es: 'Regla graduada', def: 'A rigid strip of plastic or metal marked with centimeters for measuring.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="8" y="24" width="48" height="16" rx="2" fill="#cbd5e0" stroke="#718096" stroke-width="2"/><line x1="14" y1="24" x2="14" y2="32" stroke="#2d3748" stroke-width="2"/><line x1="20" y1="24" x2="20" y2="29" stroke="#2d3748" stroke-width="2"/><line x1="26" y1="24" x2="26" y2="32" stroke="#2d3748" stroke-width="2"/><line x1="32" y1="24" x2="32" y2="29" stroke="#2d3748" stroke-width="2"/><line x1="38" y1="24" x2="38" y2="32" stroke="#2d3748" stroke-width="2"/><line x1="44" y1="24" x2="44" y2="29" stroke="#2d3748" stroke-width="2"/><line x1="50" y1="24" x2="50" y2="32" stroke="#2d3748" stroke-width="2"/></svg>` },
+            { letter: 'S', type: 'STARTS WITH', word: 'SCREWDRIVER', es: 'Destornillador', def: 'A hand tool used for turning and tightening screws.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="12" y="26" width="22" height="12" rx="4" fill="#e53e3e"/><line x1="34" y1="32" x2="52" y2="32" stroke="#a0aec0" stroke-width="5"/><polygon points="52,30 58,32 52,34" fill="#718096"/></svg>` },
+            { letter: 'T', type: 'STARTS WITH', word: 'TAPE MEASURE', es: 'Cinta métrica', def: 'A flexible ribbon ruler used to measure long distances.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="12" y="18" width="32" height="32" rx="8" fill="#d69e2e"/><circle cx="28" cy="34" r="8" fill="#2d3748"/><path d="M 44 38 L 56 38 L 56 42 L 44 42 Z" fill="#cbd5e0"/></svg>` },
+            { letter: 'U', type: 'CONTAINS', word: 'GLUE GUN', es: 'Pistola de silicona', def: 'An electric tool that melts hot glue sticks for joining materials.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 14 18 L 42 18 L 44 32 L 26 32 L 20 50 L 12 48 L 18 32 L 14 32 Z" fill="#805ad5"/><rect x="42" y="23" width="12" height="4" fill="#a0aec0"/><circle cx="56" cy="25" r="2" fill="#ed8936"/></svg>` },
+            { letter: 'V', type: 'STARTS WITH', word: 'VICE', es: 'Tornillo de banco', def: 'A device attached to a workbench to hold a piece of work firmly.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><rect x="10" y="36" width="44" height="10" fill="#4a5568"/><rect x="16" y="20" width="10" height="16" fill="#718096"/><rect x="38" y="20" width="10" height="16" fill="#718096"/><line x1="8" y1="28" x2="56" y2="28" stroke="#cbd5e0" stroke-width="4"/></svg>` },
+            { letter: 'W', type: 'STARTS WITH', word: 'WRENCH', es: 'Llave inglesa / fija', def: 'A tool used for holding and turning nuts and bolts.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 12 44 L 38 18 L 46 26 L 20 52 Z" fill="#718096"/><path d="M 42 14 C 38 10 46 4 52 10 C 58 16 52 24 48 20 C 44 22 40 18 42 14 Z" fill="#a0aec0"/></svg>` },
+            { letter: 'X', type: 'CONTAINS', word: 'HACKSAW', es: 'Sierra para metal', def: 'A fine-toothed saw set in a frame, used for cutting metal.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 12 40 L 12 18 L 52 18 L 52 40" fill="none" stroke="#e53e3e" stroke-width="5" stroke-linecap="round"/><line x1="10" y1="38" x2="54" y2="38" stroke="#cbd5e0" stroke-width="3"/><rect x="8" y="32" width="8" height="16" rx="2" fill="#2d3748"/></svg>` },
+            { letter: 'Y', type: 'CONTAINS', word: 'SAFETY GLASSES', es: 'Gafas de protección', def: 'Eyewear designed to protect eyes during practical tasks.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 10 24 L 28 24 L 26 40 L 14 40 Z" fill="#63b3ed" opacity="0.8" stroke="#3182ce" stroke-width="3"/><path d="M 36 24 L 54 24 L 50 40 L 38 40 Z" fill="#63b3ed" opacity="0.8" stroke="#3182ce" stroke-width="3"/><line x1="28" y1="28" x2="36" y2="28" stroke="#3182ce" stroke-width="3"/></svg>` },
+            { letter: 'Z', type: 'STARTS WITH', word: 'ZIP TIE', es: 'Brida de plástico', def: 'A plastic strip used to fasten wires or loose items together.', icon: `<svg viewBox="0 0 64 64" width="90" height="90"><path d="M 12 32 C 12 18 52 18 52 32 C 52 46 20 46 20 32" fill="none" stroke="#2b6cb0" stroke-width="4"/><rect x="48" y="28" width="8" height="8" rx="1" fill="#1a365d"/></svg>` }
+        ];
+
+        let currentIndex = 0;
+        let credits = 1000; // 10 veces más créditos
+        let hits = 0;
+        let misses = 0;
+        let status = new Array(questions.length).fill('pending');
+        let userAnswers = new Array(questions.length).fill('-');
+        let revealedLetters = new Array(questions.length).fill(0);
+        let timerInterval = null;
+        let vocabInterval = null;
+        let secondsElapsed = 0;
+
+        function initRosco() {
+            const rosco = document.getElementById('rosco');
+            const total = questions.length;
+            const radius = 135; 
+            const centerX = 170;
+            const centerY = 170;
+
+            for (let i = 0; i < total; i++) {
+                const angle = (i / total) * 2 * Math.PI - (Math.PI / 2);
+                const x = centerX + radius * Math.cos(angle) - 18;
+                const y = centerY + radius * Math.sin(angle) - 18;
+
+                const elem = document.createElement('div');
+                elem.className = 'letter-node';
+                elem.id = `node-${i}`;
+                elem.innerText = questions[i].letter;
+                elem.style.left = `${x}px`;
+                elem.style.top = `${y}px`;
+                elem.onclick = () => selectLetter(i);
+                rosco.appendChild(elem);
+            }
+        }
+
+        function selectLetter(index) {
+            if (status[index] === 'pending') {
+                currentIndex = index;
+                updateUI();
+            }
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            secondsElapsed = 0;
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+                const secs = String(secondsElapsed % 60).padStart(2, '0');
+                document.getElementById('timer').innerText = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function startVocabFlash() {
+            clearInterval(vocabInterval);
+            updateVocabFlash();
+            vocabInterval = setInterval(updateVocabFlash, 10000);
+        }
+
+        function updateVocabFlash() {
+            const randomIndex = Math.floor(Math.random() * questions.length);
+            const item = questions[randomIndex];
+            const flashTextElem = document.getElementById('vocab-flash-text');
+
+            flashTextElem.style.opacity = '0';
+            setTimeout(() => {
+                flashTextElem.innerHTML = `<strong>${item.es}</strong><br><span style="color: #cbd5e0;">↕</span><br><span style="color: var(--primary); font-weight: bold;">${item.word}</span>`;
+                flashTextElem.style.opacity = '1';
+            }, 300);
+        }
+
+        function updateUI() {
+            document.getElementById('score-hits').innerText = hits;
+            document.getElementById('score-misses').innerText = misses;
+            document.getElementById('credits').innerText = `${credits} 🪙`;
+
+            if (status.every(s => s !== 'pending')) {
+                endGame();
+                return;
+            }
+
+            while (status[currentIndex] !== 'pending') {
+                currentIndex = (currentIndex + 1) % questions.length;
+            }
+
+            for (let i = 0; i < questions.length; i++) {
+                const node = document.getElementById(`node-${i}`);
+                node.className = `letter-node ${status[i]}`;
+                if (i === currentIndex) node.classList.add('active');
+            }
+
+            const q = questions[currentIndex];
+            
+            const imgBox = document.getElementById('tool-image');
+            imgBox.style.opacity = '0.3';
+            setTimeout(() => {
+                imgBox.innerHTML = q.icon;
+                imgBox.style.opacity = '1';
+            }, 150);
+
+            document.getElementById('clue-type').innerText = `${q.type} '${q.letter}'`;
+            document.getElementById('definition').innerText = q.def;
+            
+            const hintDiv = document.getElementById('spanish-hint');
+            hintDiv.style.display = 'none';
+            hintDiv.innerText = '';
+
+            const input = document.getElementById('answer-input');
+            input.value = '';
+            if (revealedLetters[currentIndex] > 0) {
+                input.placeholder = getRevealedPlaceholder(q.word, revealedLetters[currentIndex]);
+            } else {
+                input.placeholder = 'Type your answer in English...';
+            }
+            input.focus();
+
+            document.getElementById('btn-buy-hint').disabled = credits < 10;
+            document.getElementById('btn-buy-letter').disabled = credits < 15;
+        }
+
+        function getRevealedPlaceholder(targetWord, count) {
+            let res = '';
+            let revealedCount = 0;
+            for (let i = 0; i < targetWord.length; i++) {
+                const char = targetWord[i];
+                if (char === ' ') {
+                    res += '  ';
+                } else if (revealedCount < count) {
+                    res += char + ' ';
+                    revealedCount++;
+                } else {
+                    res += '_ ';
+                }
+            }
+            return `Hint: ${res.trim()}`;
+        }
+
+        function checkAnswer() {
+            const input = document.getElementById('answer-input');
+            const userAns = input.value.trim().toUpperCase();
+            if (!userAns) return;
+
+            const target = questions[currentIndex].word.toUpperCase();
+            userAnswers[currentIndex] = userAns;
+
+            if (userAns === target) {
+                status[currentIndex] = 'correct';
+                hits++;
+            } else {
+                status[currentIndex] = 'error';
+                misses++;
+            }
+
+            currentIndex = (currentIndex + 1) % questions.length;
+            updateUI();
+        }
+
+        function pasapalabra() {
+            currentIndex = (currentIndex + 1) % questions.length;
+            updateUI();
+        }
+
+        function buySpanishHint() {
+            if (credits >= 10) {
+                credits -= 10;
+                const hintDiv = document.getElementById('spanish-hint');
+                hintDiv.innerText = `💡 En español: ${questions[currentIndex].es}`;
+                hintDiv.style.display = 'block';
+                document.getElementById('credits').innerText = `${credits} 🪙`;
+                document.getElementById('btn-buy-hint').disabled = credits < 10;
+                document.getElementById('btn-buy-letter').disabled = credits < 15;
+            }
+        }
+
+        function buyLetter() {
+            if (credits >= 15) {
+                credits -= 15;
+                revealedLetters[currentIndex]++;
+                document.getElementById('credits').innerText = `${credits} 🪙`;
+                const input = document.getElementById('answer-input');
+                input.placeholder = getRevealedPlaceholder(questions[currentIndex].word, revealedLetters[currentIndex]);
+                document.getElementById('btn-buy-hint').disabled = credits < 10;
+                document.getElementById('btn-buy-letter').disabled = credits < 15;
+            }
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            clearInterval(vocabInterval);
+            
+            document.getElementById('final-hits').innerText = hits;
+            document.getElementById('final-misses').innerText = misses;
+            document.getElementById('final-time').innerText = document.getElementById('timer').innerText;
+            document.getElementById('final-credits').innerText = credits;
+            document.getElementById('report-date').innerText = `Fecha de realización: ${new Date().toLocaleDateString('es-ES')} - ${new Date().toLocaleTimeString('es-ES')}`;
+
+            // Build full detailed summary table
+            const tbody = document.getElementById('results-table-body');
+            tbody.innerHTML = '';
+
+            questions.forEach((q, index) => {
+                const tr = document.createElement('tr');
+                const isCorrect = status[index] === 'correct';
+                const resultText = isCorrect ? 'Correcto ✅' : 'Error ❌';
+                const resultClass = isCorrect ? 'tag-correct' : 'tag-error';
+
+                tr.innerHTML = `
+                    <td><strong>${q.letter}</strong></td>
+                    <td>${q.word}</td>
+                    <td>${q.es}</td>
+                    <td>${userAnswers[index]}</td>
+                    <td class="${resultClass}">${resultText}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('end-modal').style.display = 'flex';
+        }
+
+        function downloadPDF() {
+            const studentName = document.getElementById('student-name').value.trim() || 'Alumno_Anonimo';
+            const element = document.getElementById('pdf-report-area');
+            
+            const opt = {
+                margin:       8,
+                filename:     `Pasapalabra_Resultado_${studentName.replace(/\s+/g, '_')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save();
+        }
+
+        function restartGame() {
+            currentIndex = 0;
+            credits = 1000;
+            hits = 0;
+            misses = 0;
+            status.fill('pending');
+            userAnswers.fill('-');
+            revealedLetters.fill(0);
+            document.getElementById('end-modal').style.display = 'none';
+            startTimer();
+            startVocabFlash();
+            updateUI();
+        }
+
+        document.getElementById('answer-input').addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        window.onload = function() {
+            initRosco();
+            startTimer();
+            startVocabFlash();
+            updateUI();
+        };
+    </script>
+</body>
+</html>
